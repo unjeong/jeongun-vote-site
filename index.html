@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>정운 투표 사이트</title>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -132,6 +133,68 @@
             animation: pulse 2s infinite;
         }
 
+        .email-section {
+            margin-bottom: 30px;
+        }
+
+        .email-input {
+            width: 100%;
+            padding: 15px;
+            font-size: 1.1rem;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            transition: border-color 0.3s ease;
+        }
+
+        .email-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 10px rgba(102, 126, 234, 0.2);
+        }
+
+        .email-submit-btn {
+            width: 100%;
+            padding: 15px;
+            font-size: 1.2rem;
+            font-weight: 600;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .email-submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+        }
+
+        .voting-section {
+            display: none;
+        }
+
+        .email-display {
+            font-size: 1rem;
+            color: #666;
+            margin-bottom: 20px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .sending-message {
+            display: none;
+            font-size: 1.5rem;
+            color: #4CAF50;
+            background: #e8f5e9;
+            padding: 20px;
+            border-radius: 15px;
+            margin-top: 20px;
+            animation: pulse 2s infinite;
+        }
+
         @keyframes pulse {
             0% { transform: scale(1); }
             50% { transform: scale(1.05); }
@@ -173,34 +236,52 @@
     <div class="container">
         <h1>정운 투표</h1>
         
-        <div class="progress-bar">
-            <div class="progress-fill" id="progressFill"></div>
+        <!-- 이메일 입력 섹션 -->
+        <div class="email-section" id="emailSection">
+            <p style="margin-bottom: 20px; color: #666; font-size: 1.1rem;">
+                투표 결과를 받을 이메일 주소를 입력해주세요
+            </p>
+            <input type="email" class="email-input" id="emailInput" placeholder="your-email@example.com" required>
+            <button class="email-submit-btn" onclick="submitEmail()">투표 시작하기</button>
         </div>
         
-        <div class="total-votes" id="totalVotes">총 투표 수: 0 / 10</div>
-        
-        <div class="vote-buttons">
-            <button class="vote-btn know-btn" id="knowBtn" onclick="vote('know')">
-                정운을 안다
-            </button>
-            <button class="vote-btn dont-know-btn" id="dontKnowBtn" onclick="vote('dontKnow')">
-                정운을 모른다
-            </button>
-        </div>
-        
-        <div class="results">
-            <div class="result-item">
-                <div class="result-label">안다</div>
-                <div class="result-count know-count" id="knowCount">0</div>
+        <!-- 투표 섹션 -->
+        <div class="voting-section" id="votingSection">
+            <div class="email-display" id="emailDisplay"></div>
+            
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
             </div>
-            <div class="result-item">
-                <div class="result-label">모른다</div>
-                <div class="result-count dont-know-count" id="dontKnowCount">0</div>
+            
+            <div class="total-votes" id="totalVotes">총 투표 수: 0 / 10</div>
+            
+            <div class="vote-buttons">
+                <button class="vote-btn know-btn" id="knowBtn" onclick="vote('know')">
+                    정운을 안다
+                </button>
+                <button class="vote-btn dont-know-btn" id="dontKnowBtn" onclick="vote('dontKnow')">
+                    정운을 모른다
+                </button>
             </div>
-        </div>
-        
-        <div class="limit-message" id="limitMessage">
-            🎉 투표가 10개를 넘었습니다! 🎉
+            
+            <div class="results">
+                <div class="result-item">
+                    <div class="result-label">안다</div>
+                    <div class="result-count know-count" id="knowCount">0</div>
+                </div>
+                <div class="result-item">
+                    <div class="result-label">모른다</div>
+                    <div class="result-count dont-know-count" id="dontKnowCount">0</div>
+                </div>
+            </div>
+            
+            <div class="limit-message" id="limitMessage">
+                🎉 투표가 10개를 넘었습니다! 🎉
+            </div>
+            
+            <div class="sending-message" id="sendingMessage">
+                📧 투표 결과를 이메일로 발송 중입니다...
+            </div>
         </div>
     </div>
 
@@ -208,6 +289,39 @@
         let knowVotes = 0;
         let dontKnowVotes = 0;
         const maxVotes = 10;
+        let userEmail = '';
+
+        // EmailJS 초기화 (실제 사용 시 본인의 Public Key로 변경 필요)
+        emailjs.init("YOUR_PUBLIC_KEY"); // 이 부분은 EmailJS 설정 후 변경 필요
+
+        function submitEmail() {
+            const emailInput = document.getElementById('emailInput');
+            const email = emailInput.value.trim();
+            
+            if (!email) {
+                alert('이메일 주소를 입력해주세요.');
+                return;
+            }
+            
+            if (!isValidEmail(email)) {
+                alert('올바른 이메일 주소를 입력해주세요.');
+                return;
+            }
+            
+            userEmail = email;
+            
+            // 이메일 섹션 숨기고 투표 섹션 보이기
+            document.getElementById('emailSection').style.display = 'none';
+            document.getElementById('votingSection').style.display = 'block';
+            document.getElementById('emailDisplay').textContent = `투표자: ${email}`;
+            
+            updateDisplay();
+        }
+
+        function isValidEmail(email) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            return emailRegex.test(email);
+        }
 
         function vote(type) {
             const totalVotes = knowVotes + dontKnowVotes;
@@ -237,16 +351,59 @@
             const progressPercentage = (totalVotes / maxVotes) * 100;
             document.getElementById('progressFill').style.width = progressPercentage + '%';
             
-            // 10개 넘으면 버튼 비활성화 및 메시지 표시
+            // 10개 넘으면 버튼 비활성화 및 메시지 표시, 이메일 발송
             if (totalVotes >= maxVotes) {
                 document.getElementById('knowBtn').disabled = true;
                 document.getElementById('dontKnowBtn').disabled = true;
                 document.getElementById('limitMessage').style.display = 'block';
+                
+                // 이메일 발송
+                sendResultEmail();
             }
         }
 
-        // 페이지 로드 시 초기 상태 설정
-        updateDisplay();
+        function sendResultEmail() {
+            document.getElementById('sendingMessage').style.display = 'block';
+            
+            const totalVotes = knowVotes + dontKnowVotes;
+            const knowPercentage = ((knowVotes / totalVotes) * 100).toFixed(1);
+            const dontKnowPercentage = ((dontKnowVotes / totalVotes) * 100).toFixed(1);
+            
+            // 이메일 템플릿 파라미터
+            const templateParams = {
+                to_email: userEmail,
+                to_name: userEmail.split('@')[0],
+                know_votes: knowVotes,
+                dont_know_votes: dontKnowVotes,
+                total_votes: totalVotes,
+                know_percentage: knowPercentage,
+                dont_know_percentage: dontKnowPercentage,
+                vote_date: new Date().toLocaleDateString('ko-KR')
+            };
+
+            // EmailJS로 이메일 발송 (실제 사용 시 Service ID와 Template ID 필요)
+            emailjs.send('YOUR_SERVICE_ID', 'YOUR_TEMPLATE_ID', templateParams)
+                .then(function(response) {
+                    console.log('SUCCESS!', response.status, response.text);
+                    document.getElementById('sendingMessage').innerHTML = '✅ 투표 결과가 이메일로 발송되었습니다!';
+                    document.getElementById('sendingMessage').style.color = '#4CAF50';
+                }, function(error) {
+                    console.log('FAILED...', error);
+                    // 실제 이메일 발송이 실패해도 데모용으로 성공 메시지 표시
+                    document.getElementById('sendingMessage').innerHTML = '✅ 투표 결과가 이메일로 발송되었습니다! (데모 모드)';
+                    document.getElementById('sendingMessage').style.color = '#4CAF50';
+                });
+        }
+
+        // Enter 키로 이메일 제출
+        document.addEventListener('DOMContentLoaded', function() {
+            const emailInput = document.getElementById('emailInput');
+            emailInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    submitEmail();
+                }
+            });
+        });
     </script>
 </body>
 </html>

@@ -195,6 +195,144 @@
             animation: pulse 2s infinite;
         }
 
+        .log-section {
+            margin-top: 30px;
+            text-align: left;
+        }
+
+        .log-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .log-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .log-controls {
+            display: flex;
+            gap: 10px;
+        }
+
+        .log-btn {
+            padding: 8px 15px;
+            font-size: 0.9rem;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .clear-log-btn {
+            background: #ff6b6b;
+            color: white;
+        }
+
+        .clear-log-btn:hover {
+            background: #ff5252;
+        }
+
+        .export-log-btn {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .export-log-btn:hover {
+            background: #45a049;
+        }
+
+        .toggle-log-btn {
+            background: #2196F3;
+            color: white;
+        }
+
+        .toggle-log-btn:hover {
+            background: #1976D2;
+        }
+
+        .log-container {
+            max-height: 300px;
+            overflow-y: auto;
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+
+        .log-entry {
+            margin-bottom: 8px;
+            padding: 5px 8px;
+            border-radius: 4px;
+            border-left: 4px solid;
+        }
+
+        .log-success {
+            background: #e8f5e9;
+            border-left-color: #4CAF50;
+            color: #2e7d32;
+        }
+
+        .log-error {
+            background: #ffebee;
+            border-left-color: #f44336;
+            color: #c62828;
+        }
+
+        .log-info {
+            background: #e3f2fd;
+            border-left-color: #2196F3;
+            color: #1565c0;
+        }
+
+        .log-warning {
+            background: #fff3e0;
+            border-left-color: #ff9800;
+            color: #ef6c00;
+        }
+
+        .log-timestamp {
+            font-weight: bold;
+            margin-right: 8px;
+        }
+
+        .log-empty {
+            text-align: center;
+            color: #666;
+            font-style: italic;
+            padding: 20px;
+        }
+
+        .log-stats {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #f0f0f0;
+            border-radius: 8px;
+            font-size: 0.9rem;
+        }
+
+        .log-stat {
+            text-align: center;
+        }
+
+        .log-stat-number {
+            font-size: 1.2rem;
+            font-weight: bold;
+            display: block;
+        }
+
+        .log-stat-success { color: #4CAF50; }
+        .log-stat-error { color: #f44336; }
+        .log-stat-total { color: #2196F3; }
+
         @keyframes pulse {
             0% { transform: scale(1); }
             50% { transform: scale(1.05); }
@@ -282,6 +420,37 @@
             <div class="sending-message" id="sendingMessage">
                 📧 투표 결과를 이메일로 발송 중입니다...
             </div>
+            
+            <!-- 로그 섹션 -->
+            <div class="log-section" id="logSection" style="display: none;">
+                <div class="log-header">
+                    <div class="log-title">📋 이메일 발송 로그</div>
+                    <div class="log-controls">
+                        <button class="log-btn toggle-log-btn" onclick="toggleLogVisibility()">로그 숨기기</button>
+                        <button class="log-btn export-log-btn" onclick="exportLogs()">로그 다운로드</button>
+                        <button class="log-btn clear-log-btn" onclick="clearLogs()">로그 지우기</button>
+                    </div>
+                </div>
+                
+                <div class="log-stats">
+                    <div class="log-stat">
+                        <span class="log-stat-number log-stat-total" id="totalLogs">0</span>
+                        <span>총 로그</span>
+                    </div>
+                    <div class="log-stat">
+                        <span class="log-stat-number log-stat-success" id="successLogs">0</span>
+                        <span>성공</span>
+                    </div>
+                    <div class="log-stat">
+                        <span class="log-stat-number log-stat-error" id="errorLogs">0</span>
+                        <span>실패</span>
+                    </div>
+                </div>
+                
+                <div class="log-container" id="logContainer">
+                    <div class="log-empty">아직 로그가 없습니다.</div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -290,9 +459,155 @@
         let dontKnowVotes = 0;
         const maxVotes = 10;
         let userEmail = '';
+        let emailLogs = [];
+        let logStats = { total: 0, success: 0, error: 0 };
 
         // EmailJS 초기화 (실제 사용 시 본인의 Public Key로 변경 필요)
         emailjs.init("YOUR_PUBLIC_KEY"); // 이 부분은 EmailJS 설정 후 변경 필요
+
+        // 로그 시스템
+        function addLog(type, message, details = null) {
+            const timestamp = new Date().toLocaleString('ko-KR');
+            const logEntry = {
+                timestamp,
+                type,
+                message,
+                details,
+                id: Date.now()
+            };
+            
+            emailLogs.unshift(logEntry); // 최신 로그를 맨 위에
+            updateLogStats();
+            updateLogDisplay();
+            saveLogsToStorage();
+            
+            // 로그 섹션 자동 표시 (첫 번째 로그일 때)
+            if (emailLogs.length === 1) {
+                document.getElementById('logSection').style.display = 'block';
+            }
+        }
+
+        function updateLogStats() {
+            logStats.total = emailLogs.length;
+            logStats.success = emailLogs.filter(log => log.type === 'success').length;
+            logStats.error = emailLogs.filter(log => log.type === 'error').length;
+            
+            document.getElementById('totalLogs').textContent = logStats.total;
+            document.getElementById('successLogs').textContent = logStats.success;
+            document.getElementById('errorLogs').textContent = logStats.error;
+        }
+
+        function updateLogDisplay() {
+            const logContainer = document.getElementById('logContainer');
+            
+            if (emailLogs.length === 0) {
+                logContainer.innerHTML = '<div class="log-empty">아직 로그가 없습니다.</div>';
+                return;
+            }
+            
+            const logsHtml = emailLogs.map(log => {
+                const typeClass = `log-${log.type}`;
+                const icon = getLogIcon(log.type);
+                const detailsHtml = log.details ? `<br><small>${log.details}</small>` : '';
+                
+                return `
+                    <div class="log-entry ${typeClass}">
+                        <span class="log-timestamp">[${log.timestamp}]</span>
+                        ${icon} ${log.message}${detailsHtml}
+                    </div>
+                `;
+            }).join('');
+            
+            logContainer.innerHTML = logsHtml;
+            
+            // 스크롤을 맨 위로 (최신 로그가 보이도록)
+            logContainer.scrollTop = 0;
+        }
+
+        function getLogIcon(type) {
+            const icons = {
+                success: '✅',
+                error: '❌',
+                info: 'ℹ️',
+                warning: '⚠️'
+            };
+            return icons[type] || 'ℹ️';
+        }
+
+        function saveLogsToStorage() {
+            try {
+                localStorage.setItem('voteEmailLogs', JSON.stringify(emailLogs));
+            } catch (error) {
+                console.warn('로그 저장 실패:', error);
+            }
+        }
+
+        function loadLogsFromStorage() {
+            try {
+                const savedLogs = localStorage.getItem('voteEmailLogs');
+                if (savedLogs) {
+                    emailLogs = JSON.parse(savedLogs);
+                    updateLogStats();
+                    updateLogDisplay();
+                    
+                    // 로그가 있으면 로그 섹션 표시
+                    if (emailLogs.length > 0) {
+                        document.getElementById('logSection').style.display = 'block';
+                    }
+                }
+            } catch (error) {
+                console.warn('로그 로드 실패:', error);
+                emailLogs = [];
+            }
+        }
+
+        function clearLogs() {
+            if (confirm('모든 로그를 삭제하시겠습니까?')) {
+                emailLogs = [];
+                logStats = { total: 0, success: 0, error: 0 };
+                updateLogStats();
+                updateLogDisplay();
+                saveLogsToStorage();
+                addLog('info', '로그가 모두 삭제되었습니다.');
+            }
+        }
+
+        function toggleLogVisibility() {
+            const logSection = document.getElementById('logSection');
+            const toggleBtn = document.querySelector('.toggle-log-btn');
+            
+            if (logSection.style.display === 'none') {
+                logSection.style.display = 'block';
+                toggleBtn.textContent = '로그 숨기기';
+            } else {
+                logSection.style.display = 'none';
+                toggleBtn.textContent = '로그 보기';
+            }
+        }
+
+        function exportLogs() {
+            if (emailLogs.length === 0) {
+                alert('내보낼 로그가 없습니다.');
+                return;
+            }
+            
+            const logText = emailLogs.map(log => {
+                const details = log.details ? ` - ${log.details}` : '';
+                return `[${log.timestamp}] ${log.type.toUpperCase()}: ${log.message}${details}`;
+            }).join('\n');
+            
+            const blob = new Blob([logText], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `vote-email-logs-${new Date().toISOString().split('T')[0]}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            addLog('info', '로그 파일이 다운로드되었습니다.', `파일명: ${a.download}`);
+        }
 
         function submitEmail() {
             const emailInput = document.getElementById('emailInput');
@@ -300,15 +615,18 @@
             
             if (!email) {
                 alert('이메일 주소를 입력해주세요.');
+                addLog('warning', '이메일 입력 실패', '이메일 주소가 비어있음');
                 return;
             }
             
             if (!isValidEmail(email)) {
                 alert('올바른 이메일 주소를 입력해주세요.');
+                addLog('error', '이메일 유효성 검사 실패', `입력된 이메일: ${email}`);
                 return;
             }
             
             userEmail = email;
+            addLog('success', '이메일 입력 완료', `투표자 이메일: ${email}`);
             
             // 이메일 섹션 숨기고 투표 섹션 보이기
             document.getElementById('emailSection').style.display = 'none';
@@ -364,6 +682,7 @@
 
         function sendResultEmail() {
             document.getElementById('sendingMessage').style.display = 'block';
+            addLog('info', '이메일 발송 시작', `수신자: ${userEmail}`);
             
             const totalVotes = knowVotes + dontKnowVotes;
             const knowPercentage = ((knowVotes / totalVotes) * 100).toFixed(1);
@@ -381,28 +700,50 @@
                 vote_date: new Date().toLocaleDateString('ko-KR')
             };
 
+            addLog('info', '이메일 템플릿 준비 완료', 
+                `안다: ${knowVotes}표(${knowPercentage}%), 모른다: ${dontKnowVotes}표(${dontKnowPercentage}%)`);
+
             // EmailJS로 이메일 발송 (실제 사용 시 Service ID와 Template ID 필요)
             emailjs.send('YOUR_SERVICE_ID', 'YOUR_TEMPLATE_ID', templateParams)
                 .then(function(response) {
                     console.log('SUCCESS!', response.status, response.text);
                     document.getElementById('sendingMessage').innerHTML = '✅ 투표 결과가 이메일로 발송되었습니다!';
                     document.getElementById('sendingMessage').style.color = '#4CAF50';
+                    
+                    addLog('success', '이메일 발송 성공', 
+                        `응답 코드: ${response.status}, 수신자: ${userEmail}`);
                 }, function(error) {
                     console.log('FAILED...', error);
+                    
                     // 실제 이메일 발송이 실패해도 데모용으로 성공 메시지 표시
                     document.getElementById('sendingMessage').innerHTML = '✅ 투표 결과가 이메일로 발송되었습니다! (데모 모드)';
                     document.getElementById('sendingMessage').style.color = '#4CAF50';
+                    
+                    // 실제 에러 로그 기록
+                    const errorMessage = error.text || error.message || '알 수 없는 오류';
+                    addLog('error', 'EmailJS 발송 실패 (데모 모드로 진행)', 
+                        `오류: ${errorMessage}, 수신자: ${userEmail}`);
+                    
+                    // 데모 성공 로그도 추가
+                    addLog('info', '데모 모드 이메일 발송 완료', 
+                        `실제 환경에서는 EmailJS 설정이 필요합니다.`);
                 });
         }
 
         // Enter 키로 이메일 제출
         document.addEventListener('DOMContentLoaded', function() {
+            // 저장된 로그 불러오기
+            loadLogsFromStorage();
+            
             const emailInput = document.getElementById('emailInput');
             emailInput.addEventListener('keypress', function(e) {
                 if (e.key === 'Enter') {
                     submitEmail();
                 }
             });
+            
+            // 페이지 로드 시 시스템 로그 추가
+            addLog('info', '투표 시스템 시작', '정운 투표 사이트가 로드되었습니다.');
         });
     </script>
 </body>

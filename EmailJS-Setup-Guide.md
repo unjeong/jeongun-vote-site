@@ -61,19 +61,36 @@
 `index.html` 파일에서 다음 부분을 수정:
 
 ```javascript
-// 295번째 줄 근처
-emailjs.init("YOUR_PUBLIC_KEY"); // ← 여기에 Public Key 입력
-
-// 385번째 줄 근처  
-emailjs.send('YOUR_SERVICE_ID', 'YOUR_TEMPLATE_ID', templateParams)
-//           ↑ Service ID    ↑ Template ID
+// 466번째 줄 근처 - EMAILJS_CONFIG 객체 수정
+const EMAILJS_CONFIG = {
+    publicKey: "YOUR_PUBLIC_KEY",    // ← 여기에 Public Key 입력
+    serviceId: "YOUR_SERVICE_ID",    // ← 여기에 Service ID 입력
+    templateId: "YOUR_TEMPLATE_ID"   // ← 여기에 Template ID 입력
+};
 ```
 
 ### 예시:
 ```javascript
-emailjs.init("user_abcdefghijk");
-emailjs.send('service_abc123', 'template_xyz789', templateParams)
+const EMAILJS_CONFIG = {
+    publicKey: "user_abcdefghijk",
+    serviceId: "service_abc123", 
+    templateId: "template_xyz789"
+};
 ```
+
+### ⚠️ 중요: 설정값 확인 방법
+
+1. **Public Key 확인**:
+   - [EmailJS Dashboard](https://dashboard.emailjs.com/admin/account) → Account 탭
+   - "Public Key" 섹션에서 복사
+
+2. **Service ID 확인**:
+   - EmailJS Dashboard → Email Services
+   - 연결한 서비스의 "Service ID" 복사
+
+3. **Template ID 확인**:
+   - EmailJS Dashboard → Email Templates  
+   - 생성한 템플릿의 "Template ID" 복사
 
 ## 6. 테스트
 

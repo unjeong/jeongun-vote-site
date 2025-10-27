@@ -25,7 +25,7 @@
 
 ## 라이브 데모
 
-[여기에서 확인하세요](https://yourusername.github.io/jeongun-vote-site)
+[여기에서 확인하세요](https://unjeong.github.io/jeongun-vote-site)
 
 ---
 

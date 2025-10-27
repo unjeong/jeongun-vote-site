@@ -4,7 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>정운 투표 사이트</title>
+    
+    <!-- EmailJS -->
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+    
+    <!-- Firebase SDK (v9 호환 모드) -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
     <style>
         * {
             margin: 0;
@@ -333,6 +339,101 @@
         .log-stat-error { color: #f44336; }
         .log-stat-total { color: #2196F3; }
 
+        /* 데이터베이스 설정 스타일 */
+        .db-config-section {
+            margin-top: 30px;
+            text-align: left;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 20px;
+            background: #f9f9f9;
+        }
+
+        .db-config-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .db-toggle {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+        }
+
+        .db-toggle input[type="checkbox"] {
+            transform: scale(1.2);
+        }
+
+        .db-toggle label {
+            font-weight: 500;
+            color: #333;
+            cursor: pointer;
+        }
+
+        .db-config-details {
+            display: none;
+            margin-top: 10px;
+            padding: 15px;
+            background: #fff;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+        }
+
+        .db-config-details.active {
+            display: block;
+        }
+
+        .config-input {
+            width: 100%;
+            padding: 8px 12px;
+            margin: 5px 0 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 0.9rem;
+        }
+
+        .config-label {
+            font-weight: 500;
+            color: #555;
+            display: block;
+            margin-top: 10px;
+        }
+
+        .config-help {
+            font-size: 0.8rem;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .db-status {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            margin-left: 10px;
+        }
+
+        .db-status.connected {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .db-status.disconnected {
+            background: #ffebee;
+            color: #c62828;
+        }
+
         @keyframes pulse {
             0% { transform: scale(1); }
             50% { transform: scale(1.05); }
@@ -394,10 +495,10 @@
             <div class="total-votes" id="totalVotes">총 투표 수: 0 / 10</div>
             
             <div class="vote-buttons">
-                <button class="vote-btn know-btn" id="knowBtn" onclick="vote('know')">
+                <button class="vote-btn know-btn" id="knowBtn" onclick="handleVote('know')">
                     정운을 안다
                 </button>
-                <button class="vote-btn dont-know-btn" id="dontKnowBtn" onclick="vote('dontKnow')">
+                <button class="vote-btn dont-know-btn" id="dontKnowBtn" onclick="handleVote('dontKnow')">
                     정운을 모른다
                 </button>
             </div>
@@ -429,6 +530,7 @@
                         <button class="log-btn toggle-log-btn" onclick="toggleLogVisibility()">로그 숨기기</button>
                         <button class="log-btn export-log-btn" onclick="exportLogs()">로그 다운로드</button>
                         <button class="log-btn clear-log-btn" onclick="clearLogs()">로그 지우기</button>
+                        <button class="log-btn" onclick="toggleDbConfig()" style="background: #9C27B0;">DB 설정</button>
                     </div>
                 </div>
                 
@@ -451,6 +553,87 @@
                     <div class="log-empty">아직 로그가 없습니다.</div>
                 </div>
             </div>
+            
+            <!-- 데이터베이스 설정 섹션 -->
+            <div class="db-config-section" id="dbConfigSection" style="display: none;">
+                <div class="db-config-title">
+                    🗄️ 데이터베이스 설정
+                    <button class="log-btn toggle-log-btn" onclick="toggleDbConfig()">설정 숨기기</button>
+                </div>
+                
+                <!-- Firebase 설정 -->
+                <div class="db-toggle">
+                    <input type="checkbox" id="firebaseEnabled" onchange="toggleDatabase('firebase')">
+                    <label for="firebaseEnabled">Firebase Firestore</label>
+                    <span class="db-status disconnected" id="firebaseStatus">연결 안됨</span>
+                </div>
+                <div class="db-config-details" id="firebaseConfig">
+                    <label class="config-label">API Key:</label>
+                    <input type="text" class="config-input" id="firebaseApiKey" placeholder="Firebase API Key">
+                    
+                    <label class="config-label">Project ID:</label>
+                    <input type="text" class="config-input" id="firebaseProjectId" placeholder="Firebase Project ID">
+                    
+                    <label class="config-label">Auth Domain:</label>
+                    <input type="text" class="config-input" id="firebaseAuthDomain" placeholder="your-project.firebaseapp.com">
+                    
+                    <div class="config-help">
+                        Firebase 콘솔에서 프로젝트 설정 → 일반 → 웹 앱에서 설정 정보를 확인할 수 있습니다.
+                    </div>
+                </div>
+                
+                <!-- Airtable 설정 -->
+                <div class="db-toggle">
+                    <input type="checkbox" id="airtableEnabled" onchange="toggleDatabase('airtable')">
+                    <label for="airtableEnabled">Airtable</label>
+                    <span class="db-status disconnected" id="airtableStatus">연결 안됨</span>
+                </div>
+                <div class="db-config-details" id="airtableConfig">
+                    <label class="config-label">API Key:</label>
+                    <input type="password" class="config-input" id="airtableApiKey" placeholder="Airtable API Key">
+                    
+                    <label class="config-label">Base ID:</label>
+                    <input type="text" class="config-input" id="airtableBaseId" placeholder="appXXXXXXXXXXXXXX">
+                    
+                    <label class="config-label">투표 테이블명:</label>
+                    <input type="text" class="config-input" id="airtableVotesTable" value="Votes">
+                    
+                    <label class="config-label">이메일 로그 테이블명:</label>
+                    <input type="text" class="config-input" id="airtableEmailLogsTable" value="EmailLogs">
+                    
+                    <div class="config-help">
+                        Airtable 계정 → API → Personal access tokens에서 토큰을 생성하고, Base ID는 베이스 URL에서 확인할 수 있습니다.
+                    </div>
+                </div>
+                
+                <!-- Google Sheets 설정 -->
+                <div class="db-toggle">
+                    <input type="checkbox" id="sheetsEnabled" onchange="toggleDatabase('googleSheets')">
+                    <label for="sheetsEnabled">Google Sheets</label>
+                    <span class="db-status disconnected" id="sheetsStatus">연결 안됨</span>
+                </div>
+                <div class="db-config-details" id="sheetsConfig">
+                    <label class="config-label">API Key:</label>
+                    <input type="password" class="config-input" id="sheetsApiKey" placeholder="Google Sheets API Key">
+                    
+                    <label class="config-label">Spreadsheet ID:</label>
+                    <input type="text" class="config-input" id="sheetsSpreadsheetId" placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms">
+                    
+                    <label class="config-label">투표 시트명:</label>
+                    <input type="text" class="config-input" id="sheetsVotesSheet" value="Votes">
+                    
+                    <label class="config-label">이메일 로그 시트명:</label>
+                    <input type="text" class="config-input" id="sheetsEmailLogsSheet" value="EmailLogs">
+                    
+                    <div class="config-help">
+                        Google Cloud Console에서 Sheets API를 활성화하고 API 키를 생성하세요. Spreadsheet ID는 구글 시트 URL에서 확인할 수 있습니다.
+                    </div>
+                </div>
+                
+                <button class="email-submit-btn" onclick="saveDbConfig()" style="margin-top: 20px;">
+                    설정 저장
+                </button>
+            </div>
         </div>
     </div>
 
@@ -467,6 +650,38 @@
             publicKey: "bl8mNKxUEeNfYA-4G",    // EmailJS Public Key
             serviceId: "service_7z0tc4g",    // EmailJS Service ID  
             templateId: "template_g9yq8dg"   // EmailJS Template ID
+        };
+
+        // 데이터베이스 설정
+        const DATABASE_CONFIG = {
+            // Firebase 설정
+            firebase: {
+                enabled: false,
+                apiKey: "YOUR_FIREBASE_API_KEY",
+                authDomain: "YOUR_PROJECT.firebaseapp.com",
+                projectId: "YOUR_PROJECT_ID",
+                storageBucket: "YOUR_PROJECT.appspot.com",
+                messagingSenderId: "123456789",
+                appId: "YOUR_APP_ID"
+            },
+            
+            // Airtable 설정
+            airtable: {
+                enabled: false,
+                apiKey: "YOUR_AIRTABLE_API_KEY",
+                baseId: "YOUR_BASE_ID",
+                votesTableName: "Votes",
+                emailLogsTableName: "EmailLogs"
+            },
+            
+            // Google Sheets 설정
+            googleSheets: {
+                enabled: false,
+                apiKey: "YOUR_GOOGLE_SHEETS_API_KEY",
+                spreadsheetId: "YOUR_SPREADSHEET_ID",
+                votesSheetName: "Votes",
+                emailLogsSheetName: "EmailLogs"
+            }
         };
 
         // EmailJS 설정 검증
@@ -495,6 +710,164 @@
                     'EmailJS-Setup-Guide.md 파일을 참고하여 설정을 완료해주세요.');
                 return false;
             }
+        }
+
+        // ===========================================
+        // 데이터베이스 연동 함수들
+        // ===========================================
+
+        // Firebase 연동
+        async function saveToFirebase(type, data) {
+            if (!DATABASE_CONFIG.firebase.enabled) return false;
+            
+            try {
+                // Firebase SDK가 로드되어 있는지 확인
+                if (typeof firebase === 'undefined') {
+                    throw new Error('Firebase SDK가 로드되지 않았습니다.');
+                }
+                
+                const db = firebase.firestore();
+                const collection = type === 'vote' ? 'votes' : 'emailLogs';
+                
+                await db.collection(collection).add({
+                    ...data,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                addLog('success', `Firebase ${type} 저장 완료`, `컬렉션: ${collection}`);
+                return true;
+            } catch (error) {
+                addLog('error', `Firebase ${type} 저장 실패`, `오류: ${error.message}`);
+                return false;
+            }
+        }
+
+        // Airtable 연동
+        async function saveToAirtable(type, data) {
+            if (!DATABASE_CONFIG.airtable.enabled) return false;
+            
+            try {
+                const tableName = type === 'vote' ? 
+                    DATABASE_CONFIG.airtable.votesTableName : 
+                    DATABASE_CONFIG.airtable.emailLogsTableName;
+                
+                const url = `https://api.airtable.com/v0/${DATABASE_CONFIG.airtable.baseId}/${tableName}`;
+                
+                // Airtable 필드 형식으로 변환
+                const fields = type === 'vote' ? {
+                    'Voter Email': data.voterEmail,
+                    'Vote Type': data.voteType,
+                    'Timestamp': new Date().toISOString(),
+                    'IP Address': data.ipAddress || '',
+                    'User Agent': data.userAgent || ''
+                } : {
+                    'Recipient Email': data.recipientEmail,
+                    'Status': data.status,
+                    'Know Votes': data.voteResults.knowVotes,
+                    'Dont Know Votes': data.voteResults.dontKnowVotes,
+                    'Total Votes': data.voteResults.totalVotes,
+                    'Timestamp': new Date().toISOString(),
+                    'Error Message': data.errorMessage || ''
+                };
+                
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${DATABASE_CONFIG.airtable.apiKey}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ fields })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                addLog('success', `Airtable ${type} 저장 완료`, `테이블: ${tableName}`);
+                return true;
+            } catch (error) {
+                addLog('error', `Airtable ${type} 저장 실패`, `오류: ${error.message}`);
+                return false;
+            }
+        }
+
+        // Google Sheets 연동
+        async function saveToGoogleSheets(type, data) {
+            if (!DATABASE_CONFIG.googleSheets.enabled) return false;
+            
+            try {
+                const sheetName = type === 'vote' ? 
+                    DATABASE_CONFIG.googleSheets.votesSheetName : 
+                    DATABASE_CONFIG.googleSheets.emailLogsSheetName;
+                
+                const url = `https://sheets.googleapis.com/v4/spreadsheets/${DATABASE_CONFIG.googleSheets.spreadsheetId}/values/${sheetName}:append`;
+                
+                // Google Sheets 행 형식으로 변환
+                const values = type === 'vote' ? [
+                    new Date().toISOString(),
+                    data.voterEmail,
+                    data.voteType,
+                    data.ipAddress || '',
+                    data.userAgent || ''
+                ] : [
+                    new Date().toISOString(),
+                    data.recipientEmail,
+                    data.status,
+                    data.voteResults.knowVotes,
+                    data.voteResults.dontKnowVotes,
+                    data.voteResults.totalVotes,
+                    data.errorMessage || ''
+                ];
+                
+                const response = await fetch(`${url}?key=${DATABASE_CONFIG.googleSheets.apiKey}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        values: [values],
+                        valueInputOption: 'RAW'
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                addLog('success', `Google Sheets ${type} 저장 완료`, `시트: ${sheetName}`);
+                return true;
+            } catch (error) {
+                addLog('error', `Google Sheets ${type} 저장 실패`, `오류: ${error.message}`);
+                return false;
+            }
+        }
+
+        // 모든 활성화된 데이터베이스에 저장
+        async function saveToAllDatabases(type, data) {
+            const results = [];
+            
+            if (DATABASE_CONFIG.firebase.enabled) {
+                results.push(await saveToFirebase(type, data));
+            }
+            
+            if (DATABASE_CONFIG.airtable.enabled) {
+                results.push(await saveToAirtable(type, data));
+            }
+            
+            if (DATABASE_CONFIG.googleSheets.enabled) {
+                results.push(await saveToGoogleSheets(type, data));
+            }
+            
+            const successCount = results.filter(r => r).length;
+            const totalCount = results.length;
+            
+            if (totalCount === 0) {
+                addLog('warning', '활성화된 데이터베이스가 없습니다', '데이터베이스 설정을 확인해주세요.');
+            } else {
+                addLog('info', `데이터베이스 저장 완료`, `${successCount}/${totalCount} 성공`);
+            }
+            
+            return successCount > 0;
         }
 
         // 로그 시스템
@@ -641,6 +1014,157 @@
             addLog('info', '로그 파일이 다운로드되었습니다.', `파일명: ${a.download}`);
         }
 
+        // ===========================================
+        // 데이터베이스 설정 UI 함수들
+        // ===========================================
+
+        function toggleDbConfig() {
+            const dbSection = document.getElementById('dbConfigSection');
+            const toggleBtn = document.querySelector('[onclick="toggleDbConfig()"]');
+            
+            if (dbSection.style.display === 'none') {
+                dbSection.style.display = 'block';
+                toggleBtn.textContent = 'DB 설정 숨기기';
+                loadDbConfig(); // 저장된 설정 불러오기
+            } else {
+                dbSection.style.display = 'none';
+                toggleBtn.textContent = 'DB 설정';
+            }
+        }
+
+        function toggleDatabase(dbType) {
+            const checkbox = document.getElementById(`${dbType}Enabled`);
+            const configDetails = document.getElementById(`${dbType}Config`);
+            
+            if (checkbox.checked) {
+                configDetails.classList.add('active');
+            } else {
+                configDetails.classList.remove('active');
+                DATABASE_CONFIG[dbType].enabled = false;
+                updateDbStatus(dbType, false);
+            }
+        }
+
+        function updateDbStatus(dbType, connected) {
+            const statusElement = document.getElementById(`${dbType}Status`);
+            if (connected) {
+                statusElement.textContent = '연결됨';
+                statusElement.className = 'db-status connected';
+            } else {
+                statusElement.textContent = '연결 안됨';
+                statusElement.className = 'db-status disconnected';
+            }
+        }
+
+        function saveDbConfig() {
+            // Firebase 설정
+            if (document.getElementById('firebaseEnabled').checked) {
+                DATABASE_CONFIG.firebase = {
+                    enabled: true,
+                    apiKey: document.getElementById('firebaseApiKey').value,
+                    authDomain: document.getElementById('firebaseAuthDomain').value,
+                    projectId: document.getElementById('firebaseProjectId').value,
+                    storageBucket: `${document.getElementById('firebaseProjectId').value}.appspot.com`,
+                    messagingSenderId: "123456789",
+                    appId: "1:123456789:web:abcdef123456"
+                };
+                
+                // Firebase 초기화 시도
+                try {
+                    if (typeof firebase !== 'undefined') {
+                        firebase.initializeApp(DATABASE_CONFIG.firebase);
+                        updateDbStatus('firebase', true);
+                        addLog('success', 'Firebase 설정 완료', `프로젝트: ${DATABASE_CONFIG.firebase.projectId}`);
+                    }
+                } catch (error) {
+                    updateDbStatus('firebase', false);
+                    addLog('error', 'Firebase 설정 실패', error.message);
+                }
+            }
+
+            // Airtable 설정
+            if (document.getElementById('airtableEnabled').checked) {
+                DATABASE_CONFIG.airtable = {
+                    enabled: true,
+                    apiKey: document.getElementById('airtableApiKey').value,
+                    baseId: document.getElementById('airtableBaseId').value,
+                    votesTableName: document.getElementById('airtableVotesTable').value,
+                    emailLogsTableName: document.getElementById('airtableEmailLogsTable').value
+                };
+                
+                updateDbStatus('airtable', true);
+                addLog('success', 'Airtable 설정 완료', `베이스: ${DATABASE_CONFIG.airtable.baseId}`);
+            }
+
+            // Google Sheets 설정
+            if (document.getElementById('sheetsEnabled').checked) {
+                DATABASE_CONFIG.googleSheets = {
+                    enabled: true,
+                    apiKey: document.getElementById('sheetsApiKey').value,
+                    spreadsheetId: document.getElementById('sheetsSpreadsheetId').value,
+                    votesSheetName: document.getElementById('sheetsVotesSheet').value,
+                    emailLogsSheetName: document.getElementById('sheetsEmailLogsSheet').value
+                };
+                
+                updateDbStatus('googleSheets', true);
+                addLog('success', 'Google Sheets 설정 완료', `스프레드시트: ${DATABASE_CONFIG.googleSheets.spreadsheetId}`);
+            }
+
+            // 설정을 로컬 스토리지에 저장
+            try {
+                localStorage.setItem('voteDbConfig', JSON.stringify(DATABASE_CONFIG));
+                addLog('info', '데이터베이스 설정이 저장되었습니다.');
+            } catch (error) {
+                addLog('error', '설정 저장 실패', error.message);
+            }
+        }
+
+        function loadDbConfig() {
+            try {
+                const savedConfig = localStorage.getItem('voteDbConfig');
+                if (savedConfig) {
+                    const config = JSON.parse(savedConfig);
+                    
+                    // Firebase 설정 로드
+                    if (config.firebase && config.firebase.enabled) {
+                        document.getElementById('firebaseEnabled').checked = true;
+                        document.getElementById('firebaseApiKey').value = config.firebase.apiKey || '';
+                        document.getElementById('firebaseProjectId').value = config.firebase.projectId || '';
+                        document.getElementById('firebaseAuthDomain').value = config.firebase.authDomain || '';
+                        toggleDatabase('firebase');
+                        updateDbStatus('firebase', true);
+                    }
+                    
+                    // Airtable 설정 로드
+                    if (config.airtable && config.airtable.enabled) {
+                        document.getElementById('airtableEnabled').checked = true;
+                        document.getElementById('airtableApiKey').value = config.airtable.apiKey || '';
+                        document.getElementById('airtableBaseId').value = config.airtable.baseId || '';
+                        document.getElementById('airtableVotesTable').value = config.airtable.votesTableName || 'Votes';
+                        document.getElementById('airtableEmailLogsTable').value = config.airtable.emailLogsTableName || 'EmailLogs';
+                        toggleDatabase('airtable');
+                        updateDbStatus('airtable', true);
+                    }
+                    
+                    // Google Sheets 설정 로드
+                    if (config.googleSheets && config.googleSheets.enabled) {
+                        document.getElementById('sheetsEnabled').checked = true;
+                        document.getElementById('sheetsApiKey').value = config.googleSheets.apiKey || '';
+                        document.getElementById('sheetsSpreadsheetId').value = config.googleSheets.spreadsheetId || '';
+                        document.getElementById('sheetsVotesSheet').value = config.googleSheets.votesSheetName || 'Votes';
+                        document.getElementById('sheetsEmailLogsSheet').value = config.googleSheets.emailLogsSheetName || 'EmailLogs';
+                        toggleDatabase('googleSheets');
+                        updateDbStatus('googleSheets', true);
+                    }
+                    
+                    // 전역 설정 업데이트
+                    Object.assign(DATABASE_CONFIG, config);
+                }
+            } catch (error) {
+                addLog('warning', '저장된 데이터베이스 설정을 불러올 수 없습니다.', error.message);
+            }
+        }
+
         function submitEmail() {
             const emailInput = document.getElementById('emailInput');
             const email = emailInput.value.trim();
@@ -673,7 +1197,16 @@
             return emailRegex.test(email);
         }
 
-        function vote(type) {
+        // 투표 버튼 클릭 핸들러 (동기)
+        function handleVote(type) {
+            vote(type).catch(error => {
+                console.error('투표 처리 중 오류:', error);
+                addLog('error', '투표 처리 실패', error.message);
+            });
+        }
+
+        // 실제 투표 처리 함수 (비동기)
+        async function vote(type) {
             const totalVotes = knowVotes + dontKnowVotes;
             
             if (totalVotes >= maxVotes) {
@@ -686,7 +1219,28 @@
                 dontKnowVotes++;
             }
 
+            // 투표 데이터를 데이터베이스에 저장
+            const voteData = {
+                voterEmail: userEmail,
+                voteType: type,
+                ipAddress: await getClientIP(),
+                userAgent: navigator.userAgent
+            };
+            
+            await saveToAllDatabases('vote', voteData);
+
             updateDisplay();
+        }
+
+        // 클라이언트 IP 주소 가져오기 (선택사항)
+        async function getClientIP() {
+            try {
+                const response = await fetch('https://api.ipify.org?format=json');
+                const data = await response.json();
+                return data.ip;
+            } catch (error) {
+                return 'unknown';
+            }
         }
 
         function updateDisplay() {
@@ -757,14 +1311,32 @@
 
             // EmailJS로 이메일 발송
             emailjs.send(EMAILJS_CONFIG.serviceId, EMAILJS_CONFIG.templateId, templateParams)
-                .then(function(response) {
+                .then(async function(response) {
                     console.log('SUCCESS!', response.status, response.text);
                     document.getElementById('sendingMessage').innerHTML = '✅ 투표 결과가 이메일로 발송되었습니다!';
                     document.getElementById('sendingMessage').style.color = '#4CAF50';
                     
                     addLog('success', '이메일 발송 성공', 
                         `응답 코드: ${response.status}, 수신자: ${userEmail}`);
-                }, function(error) {
+                    
+                    // 이메일 로그를 데이터베이스에 저장
+                    const emailLogData = {
+                        recipientEmail: userEmail,
+                        status: 'success',
+                        voteResults: {
+                            knowVotes: knowVotes,
+                            dontKnowVotes: dontKnowVotes,
+                            totalVotes: totalVotes
+                        },
+                        errorMessage: null,
+                        emailjsResponse: {
+                            status: response.status,
+                            text: response.text
+                        }
+                    };
+                    
+                    await saveToAllDatabases('emailLog', emailLogData);
+                }, async function(error) {
                     console.log('FAILED...', error);
                     
                     document.getElementById('sendingMessage').innerHTML = '❌ 이메일 발송 실패';
@@ -788,6 +1360,21 @@
                     addLog('error', `이메일 발송 실패 (${errorType})`, 
                         `오류: ${errorDetails}, 수신자: ${userEmail}`);
                     
+                    // 이메일 실패 로그를 데이터베이스에 저장
+                    const emailLogData = {
+                        recipientEmail: userEmail,
+                        status: 'failed',
+                        voteResults: {
+                            knowVotes: knowVotes,
+                            dontKnowVotes: dontKnowVotes,
+                            totalVotes: totalVotes
+                        },
+                        errorMessage: errorDetails,
+                        emailjsResponse: null
+                    };
+                    
+                    await saveToAllDatabases('emailLog', emailLogData);
+                    
                     // 해결 방법 제시
                     if (errorType === 'invalid_public_key') {
                         addLog('info', '해결 방법', 
@@ -800,6 +1387,9 @@
         document.addEventListener('DOMContentLoaded', function() {
             // 저장된 로그 불러오기
             loadLogsFromStorage();
+            
+            // 저장된 데이터베이스 설정 불러오기
+            loadDbConfig();
             
             // EmailJS 초기화
             initializeEmailJS();

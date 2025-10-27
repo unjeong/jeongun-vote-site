@@ -453,7 +453,8 @@
             height: 100%;
             background: linear-gradient(45deg, #667eea, #764ba2);
             width: 0%;
-            transition: width 0.3s ease;
+            transition: width 0.5s ease-in-out;
+            border-radius: 5px;
         }
 
         @media (max-width: 600px) {
@@ -1219,17 +1220,24 @@
                 dontKnowVotes++;
             }
 
-            // 투표 데이터를 데이터베이스에 저장
-            const voteData = {
-                voterEmail: userEmail,
-                voteType: type,
-                ipAddress: await getClientIP(),
-                userAgent: navigator.userAgent
-            };
-            
-            await saveToAllDatabases('vote', voteData);
-
+            // UI를 즉시 업데이트 (사용자 경험 개선)
             updateDisplay();
+
+            // 투표 데이터를 백그라운드에서 데이터베이스에 저장
+            try {
+                const voteData = {
+                    voterEmail: userEmail,
+                    voteType: type,
+                    ipAddress: await getClientIP(),
+                    userAgent: navigator.userAgent
+                };
+                
+                await saveToAllDatabases('vote', voteData);
+                addLog('info', '투표 데이터 저장 완료', `${type} 투표`);
+            } catch (error) {
+                console.error('투표 데이터 저장 실패:', error);
+                addLog('error', '투표 데이터 저장 실패', error.message);
+            }
         }
 
         // 클라이언트 IP 주소 가져오기 (선택사항)
@@ -1253,7 +1261,13 @@
             
             // 프로그레스 바 업데이트
             const progressPercentage = (totalVotes / maxVotes) * 100;
-            document.getElementById('progressFill').style.width = progressPercentage + '%';
+            const progressFill = document.getElementById('progressFill');
+            if (progressFill) {
+                progressFill.style.width = progressPercentage + '%';
+                console.log(`프로그레스바 업데이트: ${progressPercentage}% (${totalVotes}/${maxVotes})`);
+            } else {
+                console.error('progressFill 요소를 찾을 수 없습니다.');
+            }
             
             // 10개 넘으면 버튼 비활성화 및 메시지 표시, 이메일 발송
             if (totalVotes >= maxVotes) {

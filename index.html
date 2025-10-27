@@ -645,6 +645,7 @@
         let userEmail = '';
         let emailLogs = [];
         let logStats = { total: 0, success: 0, error: 0 };
+        let emailSent = false; // 이메일 발송 상태 추적
 
         // EmailJS 설정 (실제 사용 시 아래 값들을 변경해야 합니다)
         const EMAILJS_CONFIG = {
@@ -1183,12 +1184,24 @@
             }
             
             userEmail = email;
+            
+            // 새로운 투표 세션 시작 - 상태 초기화
+            knowVotes = 0;
+            dontKnowVotes = 0;
+            emailSent = false; // 이메일 발송 상태 초기화
+            
             addLog('success', '이메일 입력 완료', `투표자 이메일: ${email}`);
             
             // 이메일 섹션 숨기고 투표 섹션 보이기
             document.getElementById('emailSection').style.display = 'none';
             document.getElementById('votingSection').style.display = 'block';
             document.getElementById('emailDisplay').textContent = `투표자: ${email}`;
+            
+            // 버튼 활성화 (이전 세션에서 비활성화되었을 수 있음)
+            document.getElementById('knowBtn').disabled = false;
+            document.getElementById('dontKnowBtn').disabled = false;
+            document.getElementById('limitMessage').style.display = 'none';
+            document.getElementById('sendingMessage').style.display = 'none';
             
             updateDisplay();
         }
@@ -1275,12 +1288,22 @@
                 document.getElementById('dontKnowBtn').disabled = true;
                 document.getElementById('limitMessage').style.display = 'block';
                 
-                // 이메일 발송
-                sendResultEmail();
+                // 이메일을 아직 발송하지 않았을 때만 발송
+                if (!emailSent) {
+                    emailSent = true; // 발송 상태를 true로 설정
+                    sendResultEmail();
+                    addLog('info', '투표 완료', `총 ${totalVotes}표 달성으로 이메일 발송 시작`);
+                }
             }
         }
 
         function sendResultEmail() {
+            // 중복 발송 방지 - 이미 발송 중이거나 완료된 경우 리턴
+            if (emailSent && document.getElementById('sendingMessage').style.display === 'block') {
+                addLog('warning', '이메일 발송 중복 시도 차단', '이미 이메일 발송이 진행 중입니다.');
+                return;
+            }
+            
             document.getElementById('sendingMessage').style.display = 'block';
             addLog('info', '이메일 발송 시작', `수신자: ${userEmail}`);
             

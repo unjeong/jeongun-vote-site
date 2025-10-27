@@ -742,6 +742,8 @@
             const templateParams = {
                 to_email: userEmail,
                 to_name: userEmail.split('@')[0],
+                from_email: "noreply@jeongun-vote.com", // 발신자 이메일 (고정값)
+                from_name: "정운 투표 시스템", // 발신자 이름
                 know_votes: knowVotes,
                 dont_know_votes: dontKnowVotes,
                 total_votes: totalVotes,
